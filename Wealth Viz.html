@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wealth of Nations – Explorative Viz (1996–2020)</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        :root {
+            --bg: #0f1220;
+            /* dark indigo */
+            --panel: #171a2b;
+            /* panel card */
+            --muted: #8b90a6;
+            /* subtle text */
+            --text: #e8eaf6;
+            /* main text */
+            --accent: #6aa9ff;
+            /* focus accents */
+            --accent2: #86efac;
+            /* secondary */
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, #0e1120, #0b0f1c);
+            color: var(--text)
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            gap: 16px;
+            min-height: 100vh;
+            padding: 18px
+        }
+
+        .card {
+            background: var(--panel);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+        }
+
+        header.card {
+            grid-column: 1 / -1;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin: 0;
+            color: #fff;
+            letter-spacing: .2px
+        }
+
+        header p {
+            margin: 0;
+            color: var(--muted)
+        }
+
+        .controls {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .controls label {
+            font-size: 12px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 6px
+        }
+
+        .controls select,
+        .controls input[type="range"],
+        .controls button {
+            width: 100%;
+            background: #0f1424;
+            color: #e5e7eb;
+            border: 1px solid #1f2440;
+            border-radius: 10px;
+            padding: 10px
+        }
+
+        .controls .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        .controls .btn {
+            cursor: pointer;
+            border: 1px solid #2b335b
+        }
+
+        .controls .btn:focus {
+            outline: 2px solid var(--accent)
+        }
+
+        .viz {
+            padding: 10px
+        }
+
+        .viz svg {
+            width: 100%;
+            height: 520px;
+            border-radius: 14px;
+            background: #0c1122
+        }
+
+        .insight {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .pill {
+            display: inline-block;
+            background: #0e1530;
+            border: 1px solid #223160;
+            color: #cdd6f4;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px
+        }
+
+        .legend {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        .legend .sw {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%
+        }
+
+        .tip {
+            position: absolute;
+            pointer-events: none;
+            background: #0b1022;
+            border: 1px solid #2b335b;
+            color: #e8eaf6;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 12px;
+            opacity: 0;
+            transition: .15s
+        }
+
+        .axis text {
+            fill: #b7c0dd
+        }
+
+        .axis path,
+        .axis line {
+            stroke: #263154
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header class="card">
+            <div>
+                <h1>What Makes Wealthy Nations Wealthy?</h1>
+                <p>Explore 1996–2020. Education, governance, equality &rarr; prosperity. <span class="pill">Style:
+                        Observable Gallery</span></p>
+            </div>
+            <div class="legend">
+                <span class="sw" style="background:#60a5fa"></span><small>Europe</small>
+                <span class="sw" style="background:#f59e0b"></span><small>Asia</small>
+                <span class="sw" style="background:#f43f5e"></span><small>Americas</small>
+            </div>
+        </header>
+
+        <!-- Left: Controls -->
+        <aside class="card controls">
+            <div>
+                <label>Year <span id="yearLabel" class="pill">1996</span></label>
+                <input id="year" type="range" min="1996" max="2020" step="1" value="1996" />
+            </div>
+            <div class="row">
+                <div>
+                    <label>X axis</label>
+                    <select id="xVar">
+                        <option value="education">Education % GDP</option>
+                        <option value="governance">Governance Index</option>
+                        <option value="inequality">(1 − Gini)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Y axis</label>
+                    <select id="yVar">
+                        <option value="gdp">GDP per capita (PPP)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <button id="play" class="btn">▶ Play</button>
+                <button id="reset" class="btn">⟲ Reset</button>
+            </div>
+            <div>
+                <label>Highlight countries</label>
+                <select id="focus" multiple size="6"></select>
+            </div>
+        </aside>
+
+        <!-- Center: Main Viz -->
+        <main class="card viz">
+            <svg id="scatter" viewBox="0 0 900 560"></svg>
+            <div id="tooltip" class="tip"></div>
+        </main>
+
+        <!-- Right: Insight Panel -->
+        <aside class="card insight" id="insight">
+            <h3 style="margin:4px 0 0 0">Insights</h3>
+            <p id="ins-1" style="margin:0;color:var(--muted)">Hover a bubble to see details. Use the slider or Play to
+                watch trajectories.</p>
+            <p id="ins-2" style="margin:0"></p>
+            <p id="ins-3" style="margin:0"></p>
+            <small style="color:var(--muted)">Bubble size encodes governance quality.</small>
+        </aside>
+    </div>
+
+    <script>
+        // ---------- config ----------
+        const regions = { Europe: '#60a5fa', Asia: '#f59e0b', Americas: '#f43f5e' }; // 颜色映射
+        const CSV_PATH = new URL("./FinalData.csv", document.baseURI).href;
+
+        // ---------- state ----------
+        let data = [];          // [{country, region, values:[{year, education, governance, inequality, gdp}]}]
+        let year;               // 当前年份（将由数据自动设定）
+        let minYear, maxYear;   // 数据年份上下限
+        let xVar = 'education';
+        let yVar = 'gdp';
+        let playing = false, timer = null;
+
+        // ---------- DOM refs ----------
+        const svg = d3.select('#scatter');
+        const tip = d3.select('#tooltip');
+        const xSel = document.getElementById('xVar');
+        const ySel = document.getElementById('yVar');
+        const yearRange = document.getElementById('year');
+        const yearLabel = document.getElementById('yearLabel');
+        const playBtn = document.getElementById('play');
+        const resetBtn = document.getElementById('reset');
+        const focusSel = document.getElementById('focus');
+        const ins2 = document.getElementById('ins-2');
+        const ins3 = document.getElementById('ins-3');
+
+        // ---------- SVG / scales / axes ----------
+        const margin = { top: 24, right: 18, bottom: 52, left: 64 };
+        const width = 900 - margin.left - margin.right;
+        const height = 560 - margin.top - margin.bottom;
+        const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+        const gx = g.append('g').attr('class', 'axis').attr('transform', `translate(0,${height})`);
+        const gy = g.append('g').attr('class', 'axis');
+        const xLabel = g.append('text').attr('x', width / 2).attr('y', height + 40)
+            .attr('text-anchor', 'middle').attr('fill', '#cbd5e1').text('Education % GDP');
+        const yLabel = g.append('text').attr('transform', 'rotate(-90)').attr('x', -height / 2).attr('y', -48)
+            .attr('text-anchor', 'middle').attr('fill', '#cbd5e1').text('GDP per capita (PPP)');
+
+        const xScale = d3.scaleLinear().range([0, width]);
+        const yScale = d3.scaleLog().clamp(true).range([height, 0]); // GDP 用对数轴
+        const rScale = d3.scaleSqrt().domain([-1.5, 2]).range([4, 20]); // 治理指数 → 气泡大小
+        const dotsG = g.append('g');
+
+        function labelOf(v) {
+            return ({
+                education: 'Education % GDP',
+                governance: 'Governance Index',
+                inequality: '(1 − Gini)',
+                gdp: 'GDP per capita (PPP)'
+            })[v];
+        }
+
+        function valueAtYear(d, y) {
+            return d.values.find(v => v.year === y);
+        }
+
+        function updateScales() {
+            xScale.domain(d3.extent(data.flatMap(d => d.values.map(v => v[xVar])))).nice();
+
+            if (yVar === 'gdp') {
+                const gdpVals = data.flatMap(d => d.values.map(v => v.gdp));
+                const minGDP = d3.min(gdpVals);
+                const maxGDP = d3.max(gdpVals);
+                yScale.domain([Math.max(2000, minGDP), maxGDP]).nice();
+                gy.call(d3.axisLeft(yScale).ticks(6, '~s').tickSizeOuter(0));
+            } else {
+                const yVals = data.flatMap(d => d.values.map(v => v[yVar]));
+                yScale.domain(d3.extent(yVals)).nice();
+                gy.call(d3.axisLeft(yScale).ticks(6).tickSizeOuter(0));
+            }
+
+            gx.call(d3.axisBottom(xScale).ticks(6).tickSizeOuter(0));
+            xLabel.text(labelOf(xVar));
+            yLabel.text(labelOf(yVar));
+        }
+
+
+        function correlation(pairs) {
+            const xs = pairs.map(p => p[0]), ys = pairs.map(p => p[1]);
+            const mx = d3.mean(xs), my = d3.mean(ys);
+            const num = d3.sum(pairs, p => (p[0] - mx) * (p[1] - my));
+            const den = Math.sqrt(d3.sum(xs, x => (x - mx) ** 2) * d3.sum(ys, y => (y - my) ** 2));
+            return den ? num / den : 0;
+        }
+
+        function render() {
+            updateScales();
+            yearLabel.textContent = year;
+
+            const fset = new Set(Array.from(focusSel.selectedOptions).map(o => o.value));
+
+            // 只渲染在当前 year 有有效数据的国家，避免 valueAtYear 返回 undefined 导致报错
+            const visible = data.filter(d => {
+                const v = valueAtYear(d, year);
+                return v && isFinite(+v[xVar]) && isFinite(+v[yVar]) && isFinite(+v.governance);
+            });
+
+            const join = dotsG.selectAll('circle').data(visible, d => d.country);
+            const enter = join.enter().append('circle')
+                .attr('fill', d => regions[d.region] || '#94a3b8')
+                .attr('stroke', '#0b1022')
+                .attr('stroke-width', 1)
+                .on('mousemove', (event, d) => {
+                    const v = valueAtYear(d, year);
+                    if (!v) return;
+                    tip.style('opacity', 1)
+                        .style('left', (event.pageX + 12) + 'px')
+                        .style('top', (event.pageY + 12) + 'px')
+                        .html(
+                            `<strong>${d.country}</strong><br>${year}` +
+                            `<br>${labelOf(xVar)}: ${Number(v[xVar]).toFixed(2)}` +
+                            `<br>${labelOf(yVar)}: ${yVar === 'gdp' ? d3.format(',')(Math.round(v[yVar])) : Number(v[yVar]).toFixed(2)}` +
+                            `<br>Governance: ${Number(v.governance).toFixed(2)}`
+                        );
+                })
+                .on('mouseleave', () => tip.style('opacity', 0));
+
+            enter.merge(join)
+                .transition().duration(600)
+                .attr('r', d => rScale(valueAtYear(d, year).governance))
+                .attr('cx', d => xScale(valueAtYear(d, year)[xVar]))
+                .attr('cy', d => yScale(valueAtYear(d, year)[yVar]))
+                .attr('fill-opacity', d => fset.size === 0 || fset.has(d.country) ? .9 : .22)
+                .attr('stroke-width', d => fset.has(d.country) ? 2 : 1);
+
+            join.exit().remove();
+
+            // quick insight（仅基于 visible 计算相关性）
+            const corr = correlation(visible.map(d => {
+                const v = valueAtYear(d, year); return [Number(v[xVar]), Number(v[yVar])];
+            }));
+            ins2.textContent = `Year ${year}: correlation(${labelOf(xVar)}, ${labelOf(yVar)}) ≈ ${corr.toFixed(2)}`;
+            ins3.textContent = fset.size ? `Highlight: ${Array.from(fset).join(', ')}` : '';
+        }
+
+
+        // ---------- interactions ----------
+        xSel.addEventListener('change', e => { xVar = e.target.value; render(); });
+        ySel.addEventListener('change', e => { yVar = e.target.value; render(); });
+        yearRange.addEventListener('input', e => { year = +e.target.value; render(); });
+        focusSel.addEventListener('change', render);
+
+        resetBtn.addEventListener('click', () => {
+            year = minYear; yearRange.value = year; focusSel.selectedIndex = -1; render();
+        });
+
+        playBtn.addEventListener('click', () => {
+            playing = !playing; playBtn.textContent = playing ? '❚❚ Pause' : '▶ Play';
+            if (playing) {
+                timer = setInterval(() => {
+                    year = (year < maxYear) ? (year + 1) : minYear;
+                    yearRange.value = year;
+                    render();
+                }, 900);
+            } else {
+                clearInterval(timer);
+            }
+        });
+
+        function initFromRaw(raw) {
+            const byCountry = d3.group(raw, d => d.country);
+            data = Array.from(byCountry, ([country, rows]) => ({
+                country,
+                region: rows[0].region,
+                values: rows.map(r => ({
+                    year: +r.year,
+                    education: +r.education,
+                    governance: +r.governance,
+                    inequality: +r.inequality,
+                    gdp: +r.gdp
+                })).sort((a, b) => a.year - b.year)
+            }));
+
+            Array.from(byCountry.keys()).sort().forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name; opt.textContent = name;
+                focusSel.appendChild(opt);
+            });
+            // 自动设定年份范围
+            const years = raw.map(d => +d.year);
+            minYear = d3.min(years); maxYear = d3.max(years);
+            year = minYear;
+            yearRange.min = minYear;
+            yearRange.max = maxYear;
+            yearRange.value = minYear;
+            yearLabel.textContent = minYear;
+            // 初次渲染
+            updateScales();
+            render();
+        }
+        // 尝试通过 fetch 加载 CSV；失败时提供文件选择器并给出本地服务器运行提示
+        d3.csv(CSV_PATH, d3.autoType).then(initFromRaw).catch(err => {
+            console.error('CSV load error:', err);
+
+            const controls = document.querySelector('.controls');
+            const warn = document.createElement('div');
+            warn.style.color = '#f59e0b';
+            warn.style.marginTop = '8px';
+            warn.textContent = '无法通过网络加载 CSV（浏览器本地文件限制）。请选择 CSV 文件或在本地启动简单服务器：';
+            controls.appendChild(warn);
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.csv,text/csv';
+            fileInput.style.marginTop = '6px';
+            controls.appendChild(fileInput);
+
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const text = reader.result;
+                        console.log('CSV file size:', text.length);
+                        // 去掉可能存在的 BOM（UTF-8 BOM 会导致列名不匹配）
+                        const clean = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+
+                        const parsed = d3.csvParse(clean);
+                        console.log('csvParse rows:', parsed.length, 'columns:', parsed.columns);
+
+                        // 校验必需列
+                        const expected = ['country', 'region', 'year', 'education', 'governance', 'inequality', 'gdp'];
+                        const header = parsed.columns || (parsed.length ? Object.keys(parsed[0]) : []);
+                        const missing = expected.filter(k => !header.includes(k));
+                        if (missing.length) {
+                            console.error('Missing columns:', missing, 'Header:', header);
+                            alert('CSV 缺少列: ' + missing.join(', ') + '。请确认列名（区分大小写）与示例一致。');
+                            return;
+                        }
+
+                        // 明确按字段转换，避免 d3.autoType 在某些环境下触发不可预期的写操作
+                        const raw = parsed.map(row => ({
+                            country: row.country,
+                            region: row.region,
+                            year: row.year === '' || row.year == null ? null : parseInt(row.year, 10),
+                            education: row.education === '' || row.education == null ? null : +row.education,
+                            governance: row.governance === '' || row.governance == null ? null : +row.governance,
+                            inequality: row.inequality === '' || row.inequality == null ? null : +row.inequality,
+                            gdp: row.gdp === '' || row.gdp == null ? null : +row.gdp
+                        }));
+
+                        console.log('Sample parsed row:', raw[0]);
+                        initFromRaw(raw);
+                    } catch (err2) {
+                        console.error('Parse error:', err2);
+                        alert('解析 CSV 出错，请在浏览器控制台查看详细信息（可能是编码/列名问题，建议使用 UTF-8，无 BOM）。');
+                    }
+                };
+                reader.readAsText(file, 'utf-8');
+            });
+        });
+    </script>
+
+</body>
+
+</html>
